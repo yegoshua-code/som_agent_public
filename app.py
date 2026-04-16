@@ -2,7 +2,7 @@ import os
 import glob
 import json
 import streamlit as st
-from openai import OpenAI
+from google import genai
 from dotenv import load_dotenv
 
 # Load Environment Variables for local use
@@ -10,18 +10,19 @@ load_dotenv()
 
 st.set_page_config(page_title="Sleight of Mouth (SOM) Agent", layout="wide")
 
-# Initialize OpenAI client 
+# Initialize Gemini client
 # It will first try st.secrets (Streamlit Cloud), then fallback to local env
 try:
-    API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+    API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 except Exception:
-    API_KEY = os.getenv("OPENAI_API_KEY")
+    API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not API_KEY:
-    st.error("OpenAI API Key not found. Please set OPENAI_API_KEY in .env or Streamlit secrets.")
+    st.error("Gemini API Key not found. Please set GEMINI_API_KEY in Streamlit secrets via 'Advanced settings'.")
     st.stop()
 
-client = OpenAI(api_key=API_KEY)
+# Instantiate Google GenAI SDK Client
+client = genai.Client(api_key=API_KEY)
 
 @st.cache_data
 def load_som_knowledge():
@@ -64,17 +65,16 @@ Provide professional, accurate, and insightful analysis of text based on these S
 Always aim to unpack the user's beliefs or structures before applying the pattern.
 """
 
-st.title("🧩 Sleight of Mouth (Фокусы Языка) AI Agent")
+st.title("🧩 Sleight of Mouth (Фокусы Языка) Gemini Agent")
 st.markdown("Analyze sentences, challenge beliefs, and explore the **Alexander Gerasimov SOM** methodology.")
 st.caption(f"Loaded Knowledge Sources: {len(loaded_files)} patterns")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "assistant", "content": "Привет! Напиши мне любое убеждение, и я разложу его по паттернам Фокусов Языка или предложу варианты ответа."}
+        {"role": "assistant", "content": "Привет! Теперь я работаю на базе мощного **Gemini 3.1 Pro**. Напиши мне любое убеждение, и я разложу его по паттернам Фокусов Языка или предложу варианты ответа."}
     ]
 
-# Display chat history (skipping the system prompt)
+# Display chat history
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
@@ -86,24 +86,33 @@ if prompt := st.chat_input("Напиши убеждение для разбор�
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Call OpenAI
+    # Call Gemini API
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
         
         try:
-            # Note: We are using a modern model that handles large JSON structures well.
-            for response in client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
-                stream=True,
-            ):
-                full_response += (response.choices[0].delta.content or "")
-                message_placeholder.markdown(full_response + "▌")
+            # We explicitly flatten the conversation tree to ensure perfect systemic behavior 
+            # while leveraging Gemini's massive context window capabilities.
+            prompt_history = system_prompt + "\n\n--- Conversation History ---\n"
+            for m in st.session_state.messages:
+                prompt_history += f"\n{m['role'].upper()}: {m['content']}"
+            
+            prompt_history += "\nASSISTANT: "
+
+            response = client.models.generate_content_stream(
+                model='gemini-3.1-pro',
+                contents=prompt_history
+            )
+
+            for chunk in response:
+                if chunk.text:
+                    full_response += chunk.text
+                    message_placeholder.markdown(full_response + "▌")
                 
             message_placeholder.markdown(full_response)
         except Exception as e:
-            st.error(f"Error connecting to OpenAI: {e}")
-            full_response = "Извините, произошла ошибка при обращении к API."
+            st.error(f"Error connecting to Gemini API: {e}")
+            full_response = "Извините, произошла ошибка при обращении к API Gemini."
             
     st.session_state.messages.append({"role": "assistant", "content": full_response})
