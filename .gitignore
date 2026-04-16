@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.streamlit/
+search_results.txt
+audio/
+*.pdf
+*.m4a
+*.mp4
