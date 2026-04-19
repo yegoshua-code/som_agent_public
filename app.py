@@ -12,6 +12,15 @@ class RouterDecision(BaseModel):
     needs_research: bool
     patterns: list[str]
 
+class SOMAnalysisItem(BaseModel):
+    quote: str
+    som_pattern: str
+    explanation: str
+
+class FullAnalysis(BaseModel):
+    general_reply: str
+    items: list[SOMAnalysisItem]
+
 
 # Load Environment Variables for local use
 load_dotenv()
@@ -98,10 +107,37 @@ if "messages" not in st.session_state:
     ]
 
 # Display chat history
-for msg in st.session_state.messages:
+for idx, msg in enumerate(st.session_state.messages):
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            if isinstance(msg["content"], str):
+                st.markdown(msg["content"])
+            else:
+                # Structured Rendering
+                data = msg["content"]
+                if data.get("general_reply"):
+                    st.markdown(data["general_reply"])
+                
+                for i_idx, item in enumerate(data.get("items", [])):
+                    with st.container():
+                        st.info(f"**Цитата:** {item['quote']}\n\n**Фокус:** {item['som_pattern']}\n\n**Разбор:** {item['explanation']}")
+                        
+                        ui_key = f"utilize_{idx}_{i_idx}"
+                        
+                        if st.button(f"🌀 Утилизировать '{item['som_pattern']}'", key=f"btn_{ui_key}"):
+                            st.session_state[f"show_util_{ui_key}"] = True
+                            
+                        # Show utilization if button was clicked
+                        if st.session_state.get(f"show_util_{ui_key}"):
+                            if f"util_text_{ui_key}" not in st.session_state:
+                                with st.spinner("Создаю контр-ответы..."):
+                                    try:
+                                        util_prompt = f"Контекст:\nCобеседник сказал: {item['quote']}\nБыл применен фокус: {item['som_pattern']}\n\nЗадача: Напиши 3 профессиональных варианта контр-ответа (утилизации) этого фокуса языка, основываясь на теории Герасимова."
+                                        r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
+                                        st.session_state[f"util_text_{ui_key}"] = r.text
+                                    except Exception as e:
+                                        st.session_state[f"util_text_{ui_key}"] = "Ошибка генерации утилизации."
+                            st.success(st.session_state[f"util_text_{ui_key}"])
 
 if prompt := st.chat_input("Напиши убеждение или вставь отрывок диалога для разбора..."):
     # Append User msg
@@ -111,9 +147,6 @@ if prompt := st.chat_input("Напиши убеждение или вставь 
 
     # Call Gemini API
     with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        full_response = ""
-        
         try:
             # Stage 1: Fast Router (JSON only) to determine if research is needed
             router_prompt = "INSTRUCTION: You are the SOM Router. Does this user message require deep research into the raw Gerasimov books, or is it obvious enough (certainty > 45%) to answer just with the JSON schemas below? Evaluate ambiguity. If everything is clear, output needs_research=false. If probability < 45% or the topic is ambiguous, output needs_research=true and provide the list of patterns (e.g. ['01_intention', '13_apply_to_self']) to research.\n\nJSON KNOWLEDGE:\n" + som_definitions + "\n\nUSER MESSAGE:\n" + prompt
@@ -133,7 +166,10 @@ if prompt := st.chat_input("Напиши убеждение или вставь 
             # Stage 2: Prepare Full Prompt
             prompt_history = system_prompt + "\n\n--- Conversation History ---\n"
             for m in st.session_state.messages:
-                prompt_history += f"\n{m['role'].upper()}: {m['content']}"
+                if isinstance(m["content"], str):
+                    prompt_history += f"\n{m['role'].upper()}: {m['content']}"
+                else:
+                    prompt_history += f"\n{m['role'].upper()}: [Structured SOM Analysis attached]"
             
             prompt_history += "\nASSISTANT: "
             
@@ -147,20 +183,24 @@ if prompt := st.chat_input("Напиши убеждение или вставь 
                     # Inject research right before the request
                     prompt_history = raw_context + "\n" + prompt_history
 
-            # Final generation
-            response = client.models.generate_content_stream(
-                model='gemini-2.5-flash',
-                contents=prompt_history
-            )
+            # Final generation (Structured JSON)
+            with st.spinner("🧠 Генерирую разбор..."):
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt_history,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=FullAnalysis,
+                    )
+                )
 
-            for chunk in response:
-                if chunk.text:
-                    full_response += chunk.text
-                    message_placeholder.markdown(full_response + "▌")
-                
-            message_placeholder.markdown(full_response)
+            analysis_data = json.loads(response.text)
+            
+            # Append structured dict to messages instead of text
+            st.session_state.messages.append({"role": "assistant", "content": analysis_data})
+            st.rerun() # Rerun to render the new structured message
+            
         except Exception as e:
             st.error(f"Error connecting to Gemini API: {e}")
-            full_response = "Извините, произошла ошибка при обращении к API Gemini."
-            
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+            st.session_state.messages.append({"role": "assistant", "content": "Извините, произошла ошибка при обращении к API Gemini."})
+
