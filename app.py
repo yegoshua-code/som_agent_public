@@ -26,22 +26,36 @@ client = genai.Client(api_key=API_KEY)
 
 @st.cache_data
 def load_som_knowledge():
-    """Dynamically loads all available JSON schemas from the knowledge base."""
+    """Dynamically loads all available JSON schemas and raw texts from the knowledge base."""
     # Assuming app.py is in the root directory alongside knowledge_base folder
-    kb_path = os.path.join("knowledge_base", "structured", "*.json")
-    files = glob.glob(kb_path)
+    kb_path_json = os.path.join("knowledge_base", "structured", "*.json")
+    files_json = glob.glob(kb_path_json)
+    
+    kb_path_raw = os.path.join("knowledge_base", "raw", "*.txt")
+    files_raw = glob.glob(kb_path_raw)
     
     knowledge = []
     headers = []
     
-    for file_path in files:
+    # Load Structured JSONs
+    for file_path in files_json:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 knowledge.append(json.dumps(data, ensure_ascii=False))
                 headers.append(os.path.basename(file_path))
         except Exception as e:
-            st.error(f"Error loading {file_path}: {e}")
+            st.error(f"Error loading JSON {file_path}: {e}")
+            
+    # Load Raw Texts for Citations
+    for file_path in files_raw:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                text = f.read()
+                knowledge.append(f"RAW TEXT RESOURCE ({os.path.basename(file_path)}):\n{text}\n")
+                headers.append(os.path.basename(file_path))
+        except Exception as e:
+            st.error(f"Error loading RAW TXT {file_path}: {e}")
             
     return "\n---\n".join(knowledge), headers
 
@@ -54,11 +68,12 @@ Your primary task is to analyze user input and identify which Sleight of Mouth p
 or to demonstrate and teach these patterns appropriately.
 
 CRITICAL RULES:
-1. Primary Source: When generating content or definitions, rely strictly on the provided JSON knowledge schemas. Do not invent patterns outside of these definitions.
+1. Primary Source: When generating content or definitions, rely heavily on the provided JSON knowledge schemas. If the boundaries of a pattern are unclear or if there is a `[cite: X]` reference in the JSON, search the RAW TEXT RESOURCES included below to provide exact theory and nuances from Alexander Gerasimov.
 2. Handling Ambiguity: If a user statement fits multiple Sleight of Mouth patterns, DO NOT choose just one. Instead, assign probabilities to each possibility (summing to 100%) and present both/all of them.
-3. Verification: You should explicitly reference the knowledge base elements you are drawing from to justify your logic.
+3. Dialogue Analysis (Разбор диалогов): Если пользователь отправляет длинный текст, диалог или сцену, проанализируй текст структурно по репликам. Четко отделяй обычные факты (перечисление, вопросы, искренние эмоции) от применения Фокусов Языка. Объясняй логику и приводящие к фокусу убеждения.
+4. Verification: You should explicitly reference the knowledge base elements and citations you are drawing from to justify your logic.
 
-KNOWLEDGE BASE JSON SOURCES:
+KNOWLEDGE BASE (JSON AND RAW TEXT SOURCES):
 {som_definitions}
 
 Provide professional, accurate, and insightful analysis of text based on these SOM patterns. 
@@ -71,7 +86,7 @@ st.caption(f"Loaded Knowledge Sources: {len(loaded_files)} patterns")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Привет! Теперь я работаю на базе мощного **Gemini 3.1 Pro**. Напиши мне любое убеждение, и я разложу его по паттернам Фокусов Языка или предложу варианты ответа."}
+        {"role": "assistant", "content": "Привет! Я работаю на базе мощного **Gemini 3.1 Pro**.\n\nНапиши мне любое одиночное убеждение для отработки Фокусов Языка ИЛИ отправь мне отрывок диалога (например, из фильма), и я разберу его по репликам, отделив обычные факты от скрытых манипуляций!"}
     ]
 
 # Display chat history
@@ -80,7 +95,7 @@ for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-if prompt := st.chat_input("Напиши убеждение для разбора (например: 'Я слишком стар для этого')..."):
+if prompt := st.chat_input("Напиши убеждение или вставь отрывок диалога для разбора..."):
     # Append User msg
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
