@@ -198,7 +198,7 @@ GERASIMOV'S UTILIZATION MATRIX (Strict Counter-Pattern Rules):
 Task:
 1. Find the allowed counter-patterns in the "Utilization Matrix" that beat the pattern '{util_req['pattern']}'.
 2. Generate 3 professional counter-responses (utilizations), using EXACTLY THESE allowed counter-patterns.
-3. LANGUAGE RULE: The actual generated counter-responses (the phrases you suggest saying) MUST be in the EXACT SAME LANGUAGE as the User Quote (e.g., if Hebrew, the phrases must be Hebrew). However, ALL auxiliary text, explanations, and counter-pattern names MUST be STRICTLY IN ENGLISH.
+3. LANGUAGE RULE: The generated counter-responses AND ALL EXPLANATIONS/REASONING MUST be written in the EXACT SAME LANGUAGE as the User Quote (e.g., if the quote is Hebrew, the response and explanation must be in Hebrew). The ONLY thing that MUST be in English is the name of the counter-pattern used (e.g., "Meta Frame").
 """
         try:
             r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
