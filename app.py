@@ -8,6 +8,14 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
+def is_rtl(text: str) -> bool:
+    """Check if text contains primarily RTL characters (Hebrew/Arabic ranges)."""
+    if not text: return False
+    for char in text:
+        if '\u0590' <= char <= '\u08FF':
+            return True
+    return False
+
 class RouterDecision(BaseModel):
     needs_research: bool
     patterns: list[str]
@@ -120,14 +128,19 @@ for idx, msg in enumerate(st.session_state.messages):
                 
                 for i_idx, item in enumerate(data.get("items", [])):
                     with st.container():
+                        is_rtl_card = is_rtl(item['quote'])
+                        card_dir = "rtl" if is_rtl_card else "ltr"
+                        card_align = "right" if is_rtl_card else "left"
+                        border_side = "border-right" if is_rtl_card else "border-left"
+
                         if item.get("has_pattern", True):
                             html_card = f"""
-                            <div style="background-color: #eef4f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #bbdefb;">
+                            <div dir="{card_dir}" style="background-color: #eef4f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; {border_side}: 4px solid #bbdefb; text-align: {card_align};">
                               💡 <b>Цитата:</b>
-                              <div dir="auto" style="margin-top: 5px; margin-bottom: 15px; font-size: 16px; font-family: sans-serif;">{item['quote']}</div>
-                              <b>Фокус:</b> <span dir="ltr">{item['som_pattern']}</span><br><br>
+                              <div style="margin-top: 5px; margin-bottom: 15px; font-size: 16px; font-family: sans-serif;">{item['quote']}</div>
+                              <b>Фокус:</b> <span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span><br><br>
                               <b>Разбор:</b>
-                              <div dir="auto" style="margin-top: 5px;">{item['explanation']}</div>
+                              <div style="margin-top: 5px;">{item['explanation']}</div>
                             </div>
                             """
                             st.markdown(html_card, unsafe_allow_html=True)
@@ -136,9 +149,9 @@ for idx, msg in enumerate(st.session_state.messages):
                             if "utilization" in item:
                                 util_html = item['utilization'].replace('\n', '<br>')
                                 util_card = f"""
-                                <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #4CAF50;">
-                                  ✅ <b>Утилизация ('<span dir="ltr">{item['som_pattern']}</span>'):</b>
-                                  <div dir="auto" style="margin-top: 10px;">{util_html}</div>
+                                <div dir="{card_dir}" style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; {border_side}: 5px solid #4CAF50; text-align: {card_align};">
+                                  ✅ <b>Утилизация ('<span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span>'):</b>
+                                  <div style="margin-top: 10px;">{util_html}</div>
                                 </div>
                                 """
                                 st.markdown(util_card, unsafe_allow_html=True)
@@ -154,7 +167,7 @@ for idx, msg in enumerate(st.session_state.messages):
                                     st.rerun()
                                     
                         else:
-                            st.markdown(f"> 💬 <div dir='auto' style='display:inline-block;'>*{item['quote']}*</div>  \n> <small>ℹ️ Контекст: <span dir='auto'>{item['explanation']}</span></small>", unsafe_allow_html=True)
+                            st.markdown(f"<div dir='{card_dir}' style='text-align: {card_align}; margin-bottom: 10px;'>&gt; 💬 <i>{item['quote']}</i><br>&gt; <small>ℹ️ Контекст: {item['explanation']}</small></div>", unsafe_allow_html=True)
 
 # Check if we need to run an inline utilization request before handling new chat
 if "util_trigger" in st.session_state:
@@ -288,32 +301,38 @@ def export_chat_to_html(messages):
     for m in messages:
         if m['role'] == "system": continue
         role_label = "Клиент" if m['role'] == "user" else "Аналитик (SOM)"
+        
+        # Check overall role text to set direction, but better if we check inside
         html += f'<div class="msg {m["role"]}"><div class="role">{role_label}:</div>'
         
         content = m['content']
         if isinstance(content, str):
-            html += f'<div>{content}</div>'
+            html += f'<div dir="auto">{content}</div>'
         else:
-            html += f"<div>{content.get('general_reply', '')}</div>"
+            html += f'<div dir="auto">{content.get("general_reply", "")}</div>'
             for item in content.get('items', []):
+                card_dir = "rtl" if is_rtl(item['quote']) else "ltr"
+                align = "right" if card_dir == "rtl" else "left"
+                border_side = "border-right" if card_dir == "rtl" else "border-left"
+
                 if item.get("has_pattern", True):
                     html += f'''
-                    <div class="card">
+                    <div class="card" dir="{card_dir}" style="text-align: {align}; {border_side}: 4px solid #bbdefb;">
                         <b>Цитата:</b> {item['quote']}<br>
-                        <b>Фокус:</b> {item['som_pattern']}<br>
+                        <b>Фокус:</b> <span dir="ltr">{item['som_pattern']}</span><br>
                         <b>Разбор:</b> {item['explanation']}
                     </div>
                     '''
                     if "utilization" in item:
                         formatted_util = item['utilization'].replace('\n', '<br>')
                         html += f'''
-                        <div class="card" style="background-color: #e8f5e9; border-left: 5px solid #4CAF50;">
+                        <div class="card" dir="{card_dir}" style="background-color: #e8f5e9; {border_side}: 5px solid #4CAF50; text-align: {align};">
                             <b>✅ Утилизация:</b><br>{formatted_util}
                         </div>
                         '''
                 else:
                     html += f'''
-                    <div style="margin: 10px 0; padding-left: 15px; border-left: 3px solid #ccc; color: #666;">
+                    <div dir="{card_dir}" style="margin: 10px 0; padding-{align}: 15px; {border_side}: 3px solid #ccc; color: #666; text-align: {align};">
                         <i>"{item['quote']}"</i><br>
                         <small>Контекст: {item['explanation']}</small>
                     </div>
