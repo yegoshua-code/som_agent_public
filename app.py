@@ -136,7 +136,7 @@ for idx, msg in enumerate(st.session_state.messages):
 
                         if item.get("has_pattern", True):
                             html_card = f"""
-                            <div dir="{card_dir}" style="background-color: #eef4f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; {border_side}: 4px solid #bbdefb; text-align: {card_align};">
+                            <div dir="{card_dir}" style="background-color: #eef4f9; color: #1e1e1e; padding: 12px; border-radius: 8px; margin-bottom: 10px; {border_side}: 4px solid #bbdefb; text-align: {card_align};">
                               💡 <b>Quote:</b>
                               <div style="margin-top: 5px; margin-bottom: 15px; font-size: 16px; font-family: sans-serif;">{item['quote']}</div>
                               <b>Pattern:</b> <span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span><br><br>
@@ -150,7 +150,7 @@ for idx, msg in enumerate(st.session_state.messages):
                             if "utilization" in item:
                                 util_html = item['utilization'].replace('\n', '<br>')
                                 util_card = f"""
-                                <div dir="{card_dir}" style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; {border_side}: 5px solid #4CAF50; text-align: {card_align};">
+                                <div dir="{card_dir}" style="background-color: #e8f5e9; color: #1e1e1e; padding: 12px; border-radius: 8px; margin-bottom: 15px; {border_side}: 5px solid #4CAF50; text-align: {card_align};">
                                   ✅ <b>Utilization ('<span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span>'):</b>
                                   <div style="margin-top: 10px;">{util_html}</div>
                                 </div>
