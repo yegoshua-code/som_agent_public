@@ -90,8 +90,9 @@ system_prompt = f"""You are an elite expert in NLP and Alexander Gerasimov's "Sl
 Your task is to analyze dialogues or sentences and identify the exact SOM patterns being used.
 
 CRITICAL RULES:
-1. MATCH THE LANGUAGE: Write your analysis and explanations in the EXACT SAME LANGUAGE as the user's input text (e.g., if Hebrew, explanation is in Hebrew).
-2. ENGLISH PATTERN NAMES: The 'som_pattern' field MUST ALWAYS be written in English (e.g., "Intention", "Meta Frame", "Change Frame Size"), regardless of the conversation language.
+1. ANALYSIS LANGUAGE: Write your analysis ('quote' and 'explanation' fields) in the EXACT SAME LANGUAGE as the user's input text (e.g., if Hebrew, explanation is in Hebrew).
+2. GENERAL REPLY LANGUAGE: The 'general_reply' field MUST ALWAYS be written in English. Do not use Russian.
+3. ENGLISH PATTERN NAMES: The 'som_pattern' field MUST ALWAYS be written in English (e.g., "Intention", "Meta Frame", "Change Frame Size"), regardless of the conversation language.
 4. If a quote has a Sleight of Mouth pattern: set has_pattern=true, write the name of the pattern in som_pattern, and provide a clear justification in explanation.
 5. If a quote is an ordinary statement, question, or fact with NO manipulative pattern: set has_pattern=false, set som_pattern to 'None' (or equivalent in target language), and briefly state why it has no pattern in the explanation.
 6. IF the text requires deep explanation or context, router will provide RAW text. Use it to deepen your analysis.
@@ -111,7 +112,7 @@ st.caption(f"Loaded Knowledge Sources: {len(loaded_files)} patterns")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Привет! Я работаю в экономном и быстром режиме на базе **Gemini 2.5 Flash**.\n\nНапиши мне любое одиночное убеждение для отработки Фокусов Языка ИЛИ отправь мне отрывок диалога (например, из фильма), и я разберу его по репликам, отделив обычные факты от скрытых манипуляций!"}
+        {"role": "assistant", "content": "Hello! I am operating in fast mode on **Gemini 2.5 Flash**.\n\nEnter any single belief or paste a dialogue snippet (e.g., from a movie), and I will break it down line by line, separating ordinary facts from hidden SOM patterns!"}
     ]
 
 # Display chat history
@@ -136,10 +137,10 @@ for idx, msg in enumerate(st.session_state.messages):
                         if item.get("has_pattern", True):
                             html_card = f"""
                             <div dir="{card_dir}" style="background-color: #eef4f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; {border_side}: 4px solid #bbdefb; text-align: {card_align};">
-                              💡 <b>Цитата:</b>
+                              💡 <b>Quote:</b>
                               <div style="margin-top: 5px; margin-bottom: 15px; font-size: 16px; font-family: sans-serif;">{item['quote']}</div>
-                              <b>Фокус:</b> <span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span><br><br>
-                              <b>Разбор:</b>
+                              <b>Pattern:</b> <span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span><br><br>
+                              <b>Explanation:</b>
                               <div style="margin-top: 5px;">{item['explanation']}</div>
                             </div>
                             """
@@ -150,14 +151,14 @@ for idx, msg in enumerate(st.session_state.messages):
                                 util_html = item['utilization'].replace('\n', '<br>')
                                 util_card = f"""
                                 <div dir="{card_dir}" style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; {border_side}: 5px solid #4CAF50; text-align: {card_align};">
-                                  ✅ <b>Утилизация ('<span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span>'):</b>
+                                  ✅ <b>Utilization ('<span dir="ltr" style="display:inline-block;">{item['som_pattern']}</span>'):</b>
                                   <div style="margin-top: 10px;">{util_html}</div>
                                 </div>
                                 """
                                 st.markdown(util_card, unsafe_allow_html=True)
                             else:
                                 ui_key = f"utilize_{idx}_{i_idx}"
-                                if st.button(f"🌀 Утилизировать '{item['som_pattern']}'", key=f"btn_{ui_key}"):
+                                if st.button(f"🌀 Utilize '{item['som_pattern']}'", key=f"btn_{ui_key}"):
                                     st.session_state.util_trigger = {
                                         "msg_idx": idx,
                                         "item_idx": i_idx,
@@ -167,13 +168,13 @@ for idx, msg in enumerate(st.session_state.messages):
                                     st.rerun()
                                     
                         else:
-                            st.markdown(f"<div dir='{card_dir}' style='text-align: {card_align}; margin-bottom: 10px;'>&gt; 💬 <i>{item['quote']}</i><br>&gt; <small>ℹ️ Контекст: {item['explanation']}</small></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div dir='{card_dir}' style='text-align: {card_align}; margin-bottom: 10px;'>&gt; 💬 <i>{item['quote']}</i><br>&gt; <small>ℹ️ Context: {item['explanation']}</small></div>", unsafe_allow_html=True)
 
 # Check if we need to run an inline utilization request before handling new chat
 if "util_trigger" in st.session_state:
     util_req = st.session_state.util_trigger
     del st.session_state.util_trigger
-    with st.spinner(f"🌀 Генерирую утилизацию для '{util_req['pattern']}'..."):
+    with st.spinner(f"🌀 Generating utilization for '{util_req['pattern']}'..."):
         util_prompt = f"""Контекст:
 Собеседник сказал: {util_req['quote']}
 Был применен фокус: {util_req['pattern']}
@@ -204,12 +205,12 @@ if "util_trigger" in st.session_state:
             # Embed the utilization into the original message JSON object
             st.session_state.messages[util_req["msg_idx"]]["content"]["items"][util_req["item_idx"]]["utilization"] = r.text
         except Exception as e:
-            st.error(f"Ошибка утилизации: {str(e)}")
+            st.error(f"Utilization Error: {str(e)}")
         finally:
             st.rerun()
 
 # Processing new text prompts
-prompt = st.chat_input("Напиши убеждение или вставь отрывок диалога для разбора...")
+prompt = st.chat_input("Enter a belief or paste a dialogue snippet for analysis...")
 if prompt:
     # Append User msg
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -222,7 +223,7 @@ if prompt:
             # Stage 1: Fast Router (JSON only) to determine if research is needed
             router_prompt = "INSTRUCTION: You are the SOM Router. Does this user message require deep research into the raw Gerasimov books, or is it obvious enough (certainty > 45%) to answer just with the JSON schemas below? Evaluate ambiguity. If everything is clear, output needs_research=false. If probability < 45% or the topic is ambiguous, output needs_research=true and provide the list of patterns (e.g. ['01_intention', '13_apply_to_self']) to research.\n\nJSON KNOWLEDGE:\n" + som_definitions + "\n\nUSER MESSAGE:\n" + prompt
             
-            with st.spinner("🔍 Анализ (Роутер)..."):
+            with st.spinner("🔍 Analyzing (Router)..."):
                 router_response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=router_prompt,
@@ -246,7 +247,7 @@ if prompt:
             
             if decision.get("needs_research") and decision.get("patterns"):
                 found_patterns = decision.get("patterns")
-                with st.spinner(f"📚 Иду изучать полные книги: {', '.join(found_patterns)}... (вероятность < 45%)"):
+                with st.spinner(f"📚 Researching full patterns: {', '.join(found_patterns)}... (probability < 45%)"):
                     raw_context = "\n\n--- ADDITIONAL RESEARCH EXTRACTED BY ROUTER ---\n"
                     for pattern in found_patterns:
                         raw_context += load_specific_raw_pattern(pattern)
@@ -255,7 +256,7 @@ if prompt:
                     prompt_history = raw_context + "\n" + prompt_history
 
             # Final generation (Structured JSON)
-            with st.spinner("🧠 Генерирую разбор..."):
+            with st.spinner("🧠 Generating analysis..."):
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=prompt_history,
@@ -273,7 +274,7 @@ if prompt:
             
         except Exception as e:
             st.error(f"Error connecting to Gemini API: {e}")
-            st.session_state.messages.append({"role": "assistant", "content": f"Извините, произошла ошибка API: {str(e)}"})
+            st.session_state.messages.append({"role": "assistant", "content": f"Sorry, an API error occurred: {str(e)}"})
 
 # ================================
 # SIDEBAR: HTML EXPORT
@@ -295,12 +296,12 @@ def export_chat_to_html(messages):
         </style>
     </head>
     <body>
-        <h2>Sleight of Mouth (SOM) Agent - История Диалога</h2>
+        <h2>Sleight of Mouth (SOM) Agent - Dialogue History</h2>
         <hr>
     """
     for m in messages:
         if m['role'] == "system": continue
-        role_label = "Клиент" if m['role'] == "user" else "Аналитик (SOM)"
+        role_label = "User" if m['role'] == "user" else "Analyst (SOM)"
         
         # Check overall role text to set direction, but better if we check inside
         html += f'<div class="msg {m["role"]}"><div class="role">{role_label}:</div>'
@@ -318,23 +319,23 @@ def export_chat_to_html(messages):
                 if item.get("has_pattern", True):
                     html += f'''
                     <div class="card" dir="{card_dir}" style="text-align: {align}; {border_side}: 4px solid #bbdefb;">
-                        <b>Цитата:</b> {item['quote']}<br>
-                        <b>Фокус:</b> <span dir="ltr">{item['som_pattern']}</span><br>
-                        <b>Разбор:</b> {item['explanation']}
+                        <b>Quote:</b> {item['quote']}<br>
+                        <b>Pattern:</b> <span dir="ltr">{item['som_pattern']}</span><br>
+                        <b>Explanation:</b> {item['explanation']}
                     </div>
                     '''
                     if "utilization" in item:
                         formatted_util = item['utilization'].replace('\n', '<br>')
                         html += f'''
                         <div class="card" dir="{card_dir}" style="background-color: #e8f5e9; {border_side}: 5px solid #4CAF50; text-align: {align};">
-                            <b>✅ Утилизация:</b><br>{formatted_util}
+                            <b>✅ Utilization:</b><br>{formatted_util}
                         </div>
                         '''
                 else:
                     html += f'''
                     <div dir="{card_dir}" style="margin: 10px 0; padding-{align}: 15px; {border_side}: 3px solid #ccc; color: #666; text-align: {align};">
                         <i>"{item['quote']}"</i><br>
-                        <small>Контекст: {item['explanation']}</small>
+                        <small>Context: {item['explanation']}</small>
                     </div>
                     '''
         html += '</div>'
@@ -342,11 +343,11 @@ def export_chat_to_html(messages):
     return html
 
 with st.sidebar:
-    st.title("💾 Экспорт диалога")
-    st.write("Вы можете сохранить весь текущий разбор как HTML-файл. Его легко переслать или распечатать в идеальный PDF (через 'Печать' в браузере).")
+    st.title("💾 Export Dialogue")
+    st.write("You can save the entire analysis as an HTML file. It can be easily shared or printed to a perfect PDF (via 'Print' in the browser).")
     if len(st.session_state.messages) > 1:
         st.download_button(
-            label="⬇️ Скачать диалог (HTML)",
+            label="⬇️ Download Dialogue (HTML)",
             data=export_chat_to_html(st.session_state.messages),
             file_name="som_dialogue.html",
             mime="text/html"
