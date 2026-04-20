@@ -77,18 +77,17 @@ def load_specific_raw_pattern(pattern_prefix: str) -> str:
 # Load knowledge base
 som_definitions, loaded_files = load_som_knowledge()
 
-system_prompt = f"""
-You are the Alexander Gerasimov Sleight of Mouth (SOM / Фокусы Языка) Agent. 
-Your primary task is to analyze user input and identify which Sleight of Mouth patterns apply, 
-or to demonstrate and teach these patterns appropriately.
+system_prompt = f"""You are an elite expert in NLP and Alexander Gerasimov's "Sleight of Mouth" (Фокусы Языка) methodology.
+Your task is to analyze dialogues or sentences and identify the exact SOM patterns being used.
 
 CRITICAL RULES:
-1. Primary Source: When generating content or definitions, rely heavily on the provided JSON knowledge schemas. Если фокус языка неоднозначный (вероятность < 45%), обязательно подробно изучай дополнительные материалы (RAW TEXT RESOURCE), которые будут преддоставлены ниже, и только потом принимай окончательное решение.
-2. Handling Ambiguity: If a user statement fits multiple Sleight of Mouth patterns, DO NOT choose just one. Instead, assign probabilities to each possibility (summing to 100%) and present both/all of them.
-3. Dialogue Analysis (Разбор диалогов): При разборе диалогов строго следуй правилам:
-    - Там, где НЕТ Фокуса Языка (обычные факты, искренние эмоции, вопросы) — НЕ ПИШИ НИЧЕГО, просто пропускай эту реплику.
-    - Там, где ЕСТЬ Фокус Языка — напиши, КАКОЙ это фокус и ПОЧЕМУ (объясни скрытую логику/намерение).
-4. Verification: You should explicitly reference the knowledge base elements and citations you are drawing from to justify your logic.
+1. MATCH THE LANGUAGE: You MUST write your analysis and explanations in the EXACT SAME LANGUAGE as the user's input text (e.g., if the user provides English text, your 'quote', 'som_pattern', and 'explanation' must be in English. If Russian, then Russian).
+2. ONLY output data for quotes that explicitly contain a Sleight of Mouth pattern.
+3. IGNORE ordinary questions, simple statements of fact, or pure emotional expressions with no manipulative/belief-shifting structure.
+4. For each identified pattern, provide a clear, concise justification based on the rules found in your JSON knowledge base.
+5. IF the text requires deep explanation or context, router will provide RAW text. Use it to deepen your analysis.
+6. Handling Ambiguity: If a user statement fits multiple Sleight of Mouth patterns, DO NOT choose just one. Instead, assign probabilities to each possibility (summing to 100%) and present both/all of them.
+7. Verification: You should explicitly reference the knowledge base elements and citations you are drawing from to justify your logic.
 
 KNOWLEDGE BASE (JSON AND RAW TEXT SOURCES):
 {som_definitions}
@@ -132,7 +131,15 @@ for idx, msg in enumerate(st.session_state.messages):
                             if f"util_text_{ui_key}" not in st.session_state:
                                 with st.spinner("Создаю контр-ответы..."):
                                     try:
-                                        util_prompt = f"Контекст:\nCобеседник сказал: {item['quote']}\nБыл применен фокус: {item['som_pattern']}\n\nЗадача: Напиши 3 профессиональных варианта контр-ответа (утилизации) этого фокуса языка, основываясь на теории Герасимова."
+                                        util_prompt = f"""Контекст:
+Собеседник сказал: {item['quote']}
+Был применен фокус: {item['som_pattern']}
+
+Задача:
+1. Отвечай СТРОГО на том же языке, на котором написана цитата (если цитата на английском - утилизация на английском).
+2. Используй таблицу утилизации фокусов языка Герасимова (где определенный фокус утилизируется своим строгим контр-фокусом).
+3. Напиши 3 профессиональных варианта контр-ответа (утилизации) против этого фокуса языка.
+"""
                                         r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
                                         st.session_state[f"util_text_{ui_key}"] = r.text
                                     except Exception as e:
