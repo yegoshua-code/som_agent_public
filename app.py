@@ -14,6 +14,7 @@ class RouterDecision(BaseModel):
 
 class SOMAnalysisItem(BaseModel):
     quote: str
+    has_pattern: bool
     som_pattern: str
     explanation: str
 
@@ -83,9 +84,9 @@ Your task is to analyze dialogues or sentences and identify the exact SOM patter
 CRITICAL RULES:
 1. MATCH THE LANGUAGE: You MUST write your analysis and explanations in the EXACT SAME LANGUAGE as the user's input text (e.g., if the user provides English text, your 'quote', 'som_pattern', and 'explanation' must be in English. If Russian, then Russian).
 2. RTL FORMATTING: If analyzing text in Hebrew or Arabic, you MUST wrap any Hebrew/Arabic text or explanations in HTML tags: <div dir="rtl" style="text-align: right; font-size: 18px; margin-bottom: 5px;">...</div>
-3. ONLY output data for quotes that explicitly contain a Sleight of Mouth pattern.
-4. IGNORE ordinary questions, simple statements of fact, or pure emotional expressions with no manipulative/belief-shifting structure.
-5. For each identified pattern, provide a clear, concise justification based on the rules found in your JSON knowledge base.
+3. INCLUDE CONTEXT: You must process EVERY line of the user's dialogue/text sequentially to preserve the full conversational context.
+4. If a quote has a Sleight of Mouth pattern: set has_pattern=true, write the name of the pattern in som_pattern, and provide a clear justification in explanation.
+5. If a quote is an ordinary statement, question, or fact with NO manipulative pattern: set has_pattern=false, set som_pattern to 'None' (or equivalent in target language), and briefly state why it has no pattern in the explanation.
 6. IF the text requires deep explanation or context, router will provide RAW text. Use it to deepen your analysis.
 7. Handling Ambiguity: If a user statement fits multiple Sleight of Mouth patterns, DO NOT choose just one. Instead, assign probabilities to each possibility (summing to 100%) and present both/all of them.
 8. Verification: You should explicitly reference the knowledge base elements and citations you are drawing from to justify your logic.
@@ -120,12 +121,14 @@ for idx, msg in enumerate(st.session_state.messages):
                 
                 for i_idx, item in enumerate(data.get("items", [])):
                     with st.container():
-                        st.info(f"**Цитата:** {item['quote']}\n\n**Фокус:** {item['som_pattern']}\n\n**Разбор:** {item['explanation']}")
-                        
-                        ui_key = f"utilize_{idx}_{i_idx}"
-                        if st.button(f"🌀 Утилизировать '{item['som_pattern']}'", key=f"btn_{ui_key}"):
-                            st.session_state.util_request = {"quote": item['quote'], "pattern": item['som_pattern']}
-                            st.rerun()
+                        if item.get("has_pattern", True):
+                            st.info(f"**Цитата:** <span dir='auto'>{item['quote']}</span>\n\n**Фокус:** {item['som_pattern']}\n\n**Разбор:** <span dir='auto'>{item['explanation']}</span>", icon="💡")
+                            ui_key = f"utilize_{idx}_{i_idx}"
+                            if st.button(f"🌀 Утилизировать '{item['som_pattern']}'", key=f"btn_{ui_key}"):
+                                st.session_state.util_request = {"quote": item['quote'], "pattern": item['som_pattern']}
+                                st.rerun()
+                        else:
+                            st.markdown(f"> 💬 *<span dir='auto'>{item['quote']}</span>*  \n> <small>ℹ️ Контекст: <span dir='auto'>{item['explanation']}</span></small>", unsafe_allow_html=True)
 
 # Trigger manual utilization from a button click
 prompt = st.chat_input("Напиши убеждение или вставь отрывок диалога для разбора...")
@@ -269,13 +272,21 @@ def export_chat_to_html(messages):
         else:
             html += f"<div>{content.get('general_reply', '')}</div>"
             for item in content.get('items', []):
-                html += f'''
-                <div class="card">
-                    <b>Цитата:</b> {item['quote']}<br>
-                    <b>Фокус:</b> {item['som_pattern']}<br>
-                    <b>Разбор:</b> {item['explanation']}
-                </div>
-                '''
+                if item.get("has_pattern", True):
+                    html += f'''
+                    <div class="card">
+                        <b>Цитата:</b> {item['quote']}<br>
+                        <b>Фокус:</b> {item['som_pattern']}<br>
+                        <b>Разбор:</b> {item['explanation']}
+                    </div>
+                    '''
+                else:
+                    html += f'''
+                    <div style="margin: 10px 0; padding-left: 15px; border-left: 3px solid #ccc; color: #666;">
+                        <i>"{item['quote']}"</i><br>
+                        <small>Контекст: {item['explanation']}</small>
+                    </div>
+                    '''
         html += '</div>'
     html += "</body></html>"
     return html
