@@ -243,7 +243,7 @@ if prompt:
 # ================================
 
 def export_chat_to_html(messages):
-    html = \"\"\"
+    html = """
     <html>
     <head>
         <meta charset="utf-8">
@@ -260,7 +260,7 @@ def export_chat_to_html(messages):
     <body>
         <h2>Sleight of Mouth (SOM) Agent - История Диалога</h2>
         <hr>
-    \"\"\"
+    """
     for m in messages:
         if m['role'] == "system": continue
         role_label = "Клиент" if m['role'] == "user" else "Аналитик (SOM)"
