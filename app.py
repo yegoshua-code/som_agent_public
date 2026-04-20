@@ -82,8 +82,8 @@ system_prompt = f"""You are an elite expert in NLP and Alexander Gerasimov's "Sl
 Your task is to analyze dialogues or sentences and identify the exact SOM patterns being used.
 
 CRITICAL RULES:
-1. MATCH THE LANGUAGE: You MUST write your analysis and explanations in the EXACT SAME LANGUAGE as the user's input text (e.g., if the user provides English text, your 'quote', 'som_pattern', and 'explanation' must be in English. If Russian, then Russian).
-2. INCLUDE CONTEXT: You must process EVERY line of the user's dialogue/text sequentially to preserve the full conversational context.
+1. MATCH THE LANGUAGE: Write your analysis and explanations in the EXACT SAME LANGUAGE as the user's input text (e.g., if Hebrew, explanation is in Hebrew).
+2. ENGLISH PATTERN NAMES: The 'som_pattern' field MUST ALWAYS be written in English (e.g., "Intention", "Meta Frame", "Change Frame Size"), regardless of the conversation language.
 4. If a quote has a Sleight of Mouth pattern: set has_pattern=true, write the name of the pattern in som_pattern, and provide a clear justification in explanation.
 5. If a quote is an ordinary statement, question, or fact with NO manipulative pattern: set has_pattern=false, set som_pattern to 'None' (or equivalent in target language), and briefly state why it has no pattern in the explanation.
 6. IF the text requires deep explanation or context, router will provide RAW text. Use it to deepen your analysis.
@@ -121,11 +121,27 @@ for idx, msg in enumerate(st.session_state.messages):
                 for i_idx, item in enumerate(data.get("items", [])):
                     with st.container():
                         if item.get("has_pattern", True):
-                            st.info(f"**Цитата:** {item['quote']}\n\n**Фокус:** {item['som_pattern']}\n\n**Разбор:** {item['explanation']}", icon="💡")
+                            html_card = f"""
+                            <div style="background-color: #eef4f9; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #bbdefb;">
+                              💡 <b>Цитата:</b>
+                              <div dir="auto" style="margin-top: 5px; margin-bottom: 15px; font-size: 16px; font-family: sans-serif;">{item['quote']}</div>
+                              <b>Фокус:</b> <span dir="ltr">{item['som_pattern']}</span><br><br>
+                              <b>Разбор:</b>
+                              <div dir="auto" style="margin-top: 5px;">{item['explanation']}</div>
+                            </div>
+                            """
+                            st.markdown(html_card, unsafe_allow_html=True)
                             
                             # Показываем готовую утилизацию, если она уже сгенерирована
                             if "utilization" in item:
-                                st.success(f"**Утилизация ('{item['som_pattern']}'):**\n\n{item['utilization']}", icon="✅")
+                                util_html = item['utilization'].replace('\n', '<br>')
+                                util_card = f"""
+                                <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #4CAF50;">
+                                  ✅ <b>Утилизация ('<span dir="ltr">{item['som_pattern']}</span>'):</b>
+                                  <div dir="auto" style="margin-top: 10px;">{util_html}</div>
+                                </div>
+                                """
+                                st.markdown(util_card, unsafe_allow_html=True)
                             else:
                                 ui_key = f"utilize_{idx}_{i_idx}"
                                 if st.button(f"🌀 Утилизировать '{item['som_pattern']}'", key=f"btn_{ui_key}"):
@@ -138,7 +154,7 @@ for idx, msg in enumerate(st.session_state.messages):
                                     st.rerun()
                                     
                         else:
-                            st.markdown(f"> 💬 *{item['quote']}*  \n> <small>ℹ️ Контекст: {item['explanation']}</small>", unsafe_allow_html=True)
+                            st.markdown(f"> 💬 <div dir='auto' style='display:inline-block;'>*{item['quote']}*</div>  \n> <small>ℹ️ Контекст: <span dir='auto'>{item['explanation']}</span></small>", unsafe_allow_html=True)
 
 # Check if we need to run an inline utilization request before handling new chat
 if "util_trigger" in st.session_state:
@@ -167,8 +183,8 @@ if "util_trigger" in st.session_state:
 
 Задача:
 1. Найди в "Матрице Утилизации" контр-фокусы, которые бьют паттерн '{util_req['pattern']}'.
-2. Сгенерируй 3 профессиональных варианта ответа (утилизации), используя ИМЕННО ЭТИ разрешенные контр-фокусы. Для каждого варианта укажи, какой именно контр-фокус был применен.
-3. Отвечай СТРОГО на том же языке, на котором написана цитата (если цитата на иврите - утилизация на иврите).
+2. Сгенерируй 3 профессиональных варианта ответа (утилизации), используя ИМЕННО ЭТИ разрешенные контр-фокусы. Для каждого варианта укажи, какой именно контр-фокус был применен (имена контр-фокусов пиши на Английском языке).
+3. ОТВЕЧАЙ НА ТОМ ЖЕ ЯЗЫКЕ: Сами сгенерированные фразы обязаны соответствовать языку цитаты (Иврит, Русский, Английский).
 """
         try:
             r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
