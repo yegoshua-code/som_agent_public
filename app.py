@@ -83,8 +83,7 @@ Your task is to analyze dialogues or sentences and identify the exact SOM patter
 
 CRITICAL RULES:
 1. MATCH THE LANGUAGE: You MUST write your analysis and explanations in the EXACT SAME LANGUAGE as the user's input text (e.g., if the user provides English text, your 'quote', 'som_pattern', and 'explanation' must be in English. If Russian, then Russian).
-2. RTL FORMATTING: If analyzing text in Hebrew or Arabic, you MUST wrap any Hebrew/Arabic text or explanations in HTML tags: <div dir="rtl" style="text-align: right; font-size: 18px; margin-bottom: 5px;">...</div>
-3. INCLUDE CONTEXT: You must process EVERY line of the user's dialogue/text sequentially to preserve the full conversational context.
+2. INCLUDE CONTEXT: You must process EVERY line of the user's dialogue/text sequentially to preserve the full conversational context.
 4. If a quote has a Sleight of Mouth pattern: set has_pattern=true, write the name of the pattern in som_pattern, and provide a clear justification in explanation.
 5. If a quote is an ordinary statement, question, or fact with NO manipulative pattern: set has_pattern=false, set som_pattern to 'None' (or equivalent in target language), and briefly state why it has no pattern in the explanation.
 6. IF the text requires deep explanation or context, router will provide RAW text. Use it to deepen your analysis.
@@ -122,13 +121,13 @@ for idx, msg in enumerate(st.session_state.messages):
                 for i_idx, item in enumerate(data.get("items", [])):
                     with st.container():
                         if item.get("has_pattern", True):
-                            st.info(f"**Цитата:** <span dir='auto'>{item['quote']}</span>\n\n**Фокус:** {item['som_pattern']}\n\n**Разбор:** <span dir='auto'>{item['explanation']}</span>", icon="💡")
+                            st.info(f"**Цитата:** {item['quote']}\n\n**Фокус:** {item['som_pattern']}\n\n**Разбор:** {item['explanation']}", icon="💡")
                             ui_key = f"utilize_{idx}_{i_idx}"
                             if st.button(f"🌀 Утилизировать '{item['som_pattern']}'", key=f"btn_{ui_key}"):
                                 st.session_state.util_request = {"quote": item['quote'], "pattern": item['som_pattern']}
                                 st.rerun()
                         else:
-                            st.markdown(f"> 💬 *<span dir='auto'>{item['quote']}</span>*  \n> <small>ℹ️ Контекст: <span dir='auto'>{item['explanation']}</span></small>", unsafe_allow_html=True)
+                            st.markdown(f"> 💬 *{item['quote']}*  \n> <small>ℹ️ Контекст: {item['explanation']}</small>", unsafe_allow_html=True)
 
 # Trigger manual utilization from a button click
 prompt = st.chat_input("Напиши убеждение или вставь отрывок диалога для разбора...")
@@ -175,7 +174,7 @@ if prompt:
 Задача:
 1. Найди в "Матрице Утилизации" контр-фокусы, которые бьют паттерн '{util_req['pattern']}'.
 2. Сгенерируй 3 профессиональных варианта ответа (утилизации), используя ИМЕННО ЭТИ разрешенные контр-фокусы. Для каждого варианта укажи, какой именно контр-фокус был применен.
-3. Отвечай СТРОГО на том же языке, на котором написана цитата (если цитата на иврите - утилизация на иврите, используй HTML <div dir="rtl" style="text-align: right;">...</div> для самого перевода).
+3. Отвечай СТРОГО на том же языке, на котором написана цитата (если цитата на иврите - утилизация на иврите).
 """
                     r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
                     st.session_state.messages.append({"role": "assistant", "content": r.text})
