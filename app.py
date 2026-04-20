@@ -82,12 +82,13 @@ Your task is to analyze dialogues or sentences and identify the exact SOM patter
 
 CRITICAL RULES:
 1. MATCH THE LANGUAGE: You MUST write your analysis and explanations in the EXACT SAME LANGUAGE as the user's input text (e.g., if the user provides English text, your 'quote', 'som_pattern', and 'explanation' must be in English. If Russian, then Russian).
-2. ONLY output data for quotes that explicitly contain a Sleight of Mouth pattern.
-3. IGNORE ordinary questions, simple statements of fact, or pure emotional expressions with no manipulative/belief-shifting structure.
-4. For each identified pattern, provide a clear, concise justification based on the rules found in your JSON knowledge base.
-5. IF the text requires deep explanation or context, router will provide RAW text. Use it to deepen your analysis.
-6. Handling Ambiguity: If a user statement fits multiple Sleight of Mouth patterns, DO NOT choose just one. Instead, assign probabilities to each possibility (summing to 100%) and present both/all of them.
-7. Verification: You should explicitly reference the knowledge base elements and citations you are drawing from to justify your logic.
+2. RTL FORMATTING: If analyzing text in Hebrew or Arabic, you MUST wrap any Hebrew/Arabic text or explanations in HTML tags: <div dir="rtl" style="text-align: right; font-size: 18px; margin-bottom: 5px;">...</div>
+3. ONLY output data for quotes that explicitly contain a Sleight of Mouth pattern.
+4. IGNORE ordinary questions, simple statements of fact, or pure emotional expressions with no manipulative/belief-shifting structure.
+5. For each identified pattern, provide a clear, concise justification based on the rules found in your JSON knowledge base.
+6. IF the text requires deep explanation or context, router will provide RAW text. Use it to deepen your analysis.
+7. Handling Ambiguity: If a user statement fits multiple Sleight of Mouth patterns, DO NOT choose just one. Instead, assign probabilities to each possibility (summing to 100%) and present both/all of them.
+8. Verification: You should explicitly reference the knowledge base elements and citations you are drawing from to justify your logic.
 
 KNOWLEDGE BASE (JSON AND RAW TEXT SOURCES):
 {som_definitions}
@@ -110,30 +111,47 @@ for idx, msg in enumerate(st.session_state.messages):
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
             if isinstance(msg["content"], str):
-                st.markdown(msg["content"])
+                st.markdown(msg["content"], unsafe_allow_html=True)
             else:
                 # Structured Rendering
                 data = msg["content"]
                 if data.get("general_reply"):
-                    st.markdown(data["general_reply"])
+                    st.markdown(data["general_reply"], unsafe_allow_html=True)
                 
                 for i_idx, item in enumerate(data.get("items", [])):
                     with st.container():
                         st.info(f"**Цитата:** {item['quote']}\n\n**Фокус:** {item['som_pattern']}\n\n**Разбор:** {item['explanation']}")
                         
                         ui_key = f"utilize_{idx}_{i_idx}"
-                        
                         if st.button(f"🌀 Утилизировать '{item['som_pattern']}'", key=f"btn_{ui_key}"):
-                            st.session_state[f"show_util_{ui_key}"] = True
-                            
-                        # Show utilization if button was clicked
-                        if st.session_state.get(f"show_util_{ui_key}"):
-                            if f"util_text_{ui_key}" not in st.session_state:
-                                with st.spinner("Создаю контр-ответы..."):
-                                    try:
-                                        util_prompt = f"""Контекст:
-Собеседник сказал: {item['quote']}
-Был применен фокус: {item['som_pattern']}
+                            st.session_state.util_request = {"quote": item['quote'], "pattern": item['som_pattern']}
+                            st.rerun()
+
+# Trigger manual utilization from a button click
+prompt = st.chat_input("Напиши убеждение или вставь отрывок диалога для разбора...")
+util_req = None
+
+if "util_request" in st.session_state:
+    util = st.session_state.util_request
+    prompt = f"[UTILIZE_CMD] Генирируй утилизацию для паттерна '{util['pattern']}' к фразе: '{util['quote']}'"
+    util_req = util
+    del st.session_state.util_request
+
+if prompt:
+    # Append User msg
+    display_prompt = prompt.replace("[UTILIZE_CMD] ", "")
+    st.session_state.messages.append({"role": "user", "content": display_prompt})
+    with st.chat_message("user"):
+        st.markdown(display_prompt, unsafe_allow_html=True)
+
+    # Call Gemini API
+    with st.chat_message("assistant"):
+        try:
+            if util_req:
+                with st.spinner("🌀 Создаю контр-ответы (Утилизация)..."):
+                    util_prompt = f"""Контекст:
+Собеседник сказал: {util_req['quote']}
+Был применен фокус: {util_req['pattern']}
 
 МАТРИЦА УТИЛИЗАЦИИ ГЕРАСИМОВА (Строгие правила контр-приемов):
 - Намерение утилизируется через: Переопределение, Другой результат, Иерархия критериев, Метафрейм.
@@ -152,78 +170,124 @@ for idx, msg in enumerate(st.session_state.messages):
 - Метафрейм: Метафрейм более высокого уровня.
 
 Задача:
-1. Найди в "Матрице Утилизации" контр-фокусы, которые бьют паттерн '{item['som_pattern']}'.
+1. Найди в "Матрице Утилизации" контр-фокусы, которые бьют паттерн '{util_req['pattern']}'.
 2. Сгенерируй 3 профессиональных варианта ответа (утилизации), используя ИМЕННО ЭТИ разрешенные контр-фокусы. Для каждого варианта укажи, какой именно контр-фокус был применен.
-3. Отвечай СТРОГО на том же языке, на котором написана цитата (если цитата на английском - утилизация на английском).
+3. Отвечай СТРОГО на том же языке, на котором написана цитата (если цитата на иврите - утилизация на иврите, используй HTML <div dir="rtl" style="text-align: right;">...</div> для самого перевода).
 """
-                                        r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
-                                        st.session_state[f"util_text_{ui_key}"] = r.text
-                                    except Exception as e:
-                                        st.session_state[f"util_text_{ui_key}"] = "Ошибка генерации утилизации."
-                            st.success(st.session_state[f"util_text_{ui_key}"])
+                    r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
+                    st.session_state.messages.append({"role": "assistant", "content": r.text})
+                    st.rerun()
 
-if prompt := st.chat_input("Напиши убеждение или вставь отрывок диалога для разбора..."):
-    # Append User msg
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Call Gemini API
-    with st.chat_message("assistant"):
-        try:
-            # Stage 1: Fast Router (JSON only) to determine if research is needed
-            router_prompt = "INSTRUCTION: You are the SOM Router. Does this user message require deep research into the raw Gerasimov books, or is it obvious enough (certainty > 45%) to answer just with the JSON schemas below? Evaluate ambiguity. If everything is clear, output needs_research=false. If probability < 45% or the topic is ambiguous, output needs_research=true and provide the list of patterns (e.g. ['01_intention', '13_apply_to_self']) to research.\n\nJSON KNOWLEDGE:\n" + som_definitions + "\n\nUSER MESSAGE:\n" + prompt
-            
-            with st.spinner("🔍 Анализ (Роутер)..."):
-                router_response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=router_prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=RouterDecision,
-                    ),
-                )
+            else:
+                # Stage 1: Fast Router (JSON only) to determine if research is needed
+                router_prompt = "INSTRUCTION: You are the SOM Router. Does this user message require deep research into the raw Gerasimov books, or is it obvious enough (certainty > 45%) to answer just with the JSON schemas below? Evaluate ambiguity. If everything is clear, output needs_research=false. If probability < 45% or the topic is ambiguous, output needs_research=true and provide the list of patterns (e.g. ['01_intention', '13_apply_to_self']) to research.\n\nJSON KNOWLEDGE:\n" + som_definitions + "\n\nUSER MESSAGE:\n" + prompt
                 
-            decision = json.loads(router_response.text)
-            
-            # Stage 2: Prepare Full Prompt
-            prompt_history = system_prompt + "\n\n--- Conversation History ---\n"
-            for m in st.session_state.messages:
-                if isinstance(m["content"], str):
-                    prompt_history += f"\n{m['role'].upper()}: {m['content']}"
-                else:
-                    prompt_history += f"\n{m['role'].upper()}: [Structured SOM Analysis attached]"
-            
-            prompt_history += "\nASSISTANT: "
-            
-            if decision.get("needs_research") and decision.get("patterns"):
-                found_patterns = decision.get("patterns")
-                with st.spinner(f"📚 Иду изучать полные книги: {', '.join(found_patterns)}... (вероятность < 45%)"):
-                    raw_context = "\n\n--- ADDITIONAL RESEARCH EXTRACTED BY ROUTER ---\n"
-                    for pattern in found_patterns:
-                        raw_context += load_specific_raw_pattern(pattern)
-                    
-                    # Inject research right before the request
-                    prompt_history = raw_context + "\n" + prompt_history
-
-            # Final generation (Structured JSON)
-            with st.spinner("🧠 Генерирую разбор..."):
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=prompt_history,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=FullAnalysis,
+                with st.spinner("🔍 Анализ (Роутер)..."):
+                    router_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=router_prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=RouterDecision,
+                        ),
                     )
-                )
+                    
+                decision = json.loads(router_response.text)
+                
+                # Stage 2: Prepare Full Prompt
+                prompt_history = system_prompt + "\n\n--- Conversation History ---\n"
+                for m in st.session_state.messages:
+                    if isinstance(m["content"], str):
+                        prompt_history += f"\n{m['role'].upper()}: {m['content']}"
+                    else:
+                        prompt_history += f"\n{m['role'].upper()}: [Structured SOM Analysis attached]"
+                
+                prompt_history += "\nASSISTANT: "
+                
+                if decision.get("needs_research") and decision.get("patterns"):
+                    found_patterns = decision.get("patterns")
+                    with st.spinner(f"📚 Иду изучать полные книги: {', '.join(found_patterns)}... (вероятность < 45%)"):
+                        raw_context = "\n\n--- ADDITIONAL RESEARCH EXTRACTED BY ROUTER ---\n"
+                        for pattern in found_patterns:
+                            raw_context += load_specific_raw_pattern(pattern)
+                        
+                        # Inject research right before the request
+                        prompt_history = raw_context + "\n" + prompt_history
 
-            analysis_data = json.loads(response.text)
-            
-            # Append structured dict to messages instead of text
-            st.session_state.messages.append({"role": "assistant", "content": analysis_data})
-            st.rerun() # Rerun to render the new structured message
+                # Final generation (Structured JSON)
+                with st.spinner("🧠 Генерирую разбор..."):
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt_history,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=FullAnalysis,
+                        )
+                    )
+
+                analysis_data = json.loads(response.text)
+                
+                # Append structured dict to messages instead of text
+                st.session_state.messages.append({"role": "assistant", "content": analysis_data})
+                st.rerun() # Rerun to render the new structured message
             
         except Exception as e:
             st.error(f"Error connecting to Gemini API: {e}")
-            st.session_state.messages.append({"role": "assistant", "content": "Извините, произошла ошибка при обращении к API Gemini."})
+            st.session_state.messages.append({"role": "assistant", "content": f"Извините, произошла ошибка API: {str(e)}"})
+
+# ================================
+# SIDEBAR: HTML EXPORT
+# ================================
+
+def export_chat_to_html(messages):
+    html = \"\"\"
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>SOM Dialog Export</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; max-width: 800px; margin: 0 auto; color: #333; }
+            .msg { margin-bottom: 20px; padding: 15px; border-radius: 8px; }
+            .user { background-color: #e6f3ff; border-left: 5px solid #2196F3; }
+            .assistant { background-color: #f9f9f9; border-left: 5px solid #4CAF50; }
+            .role { font-weight: bold; margin-bottom: 5px; color: #555; }
+            .card { background: white; padding: 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <h2>Sleight of Mouth (SOM) Agent - История Диалога</h2>
+        <hr>
+    \"\"\"
+    for m in messages:
+        if m['role'] == "system": continue
+        role_label = "Клиент" if m['role'] == "user" else "Аналитик (SOM)"
+        html += f'<div class="msg {m["role"]}"><div class="role">{role_label}:</div>'
+        
+        content = m['content']
+        if isinstance(content, str):
+            html += f'<div>{content}</div>'
+        else:
+            html += f"<div>{content.get('general_reply', '')}</div>"
+            for item in content.get('items', []):
+                html += f'''
+                <div class="card">
+                    <b>Цитата:</b> {item['quote']}<br>
+                    <b>Фокус:</b> {item['som_pattern']}<br>
+                    <b>Разбор:</b> {item['explanation']}
+                </div>
+                '''
+        html += '</div>'
+    html += "</body></html>"
+    return html
+
+with st.sidebar:
+    st.title("💾 Экспорт диалога")
+    st.write("Вы можете сохранить весь текущий разбор как HTML-файл. Его легко переслать или распечатать в идеальный PDF (через 'Печать' в браузере).")
+    if len(st.session_state.messages) > 1:
+        st.download_button(
+            label="⬇️ Скачать диалог (HTML)",
+            data=export_chat_to_html(st.session_state.messages),
+            file_name="som_dialogue.html",
+            mime="text/html"
+        )
 
