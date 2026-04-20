@@ -175,30 +175,30 @@ if "util_trigger" in st.session_state:
     util_req = st.session_state.util_trigger
     del st.session_state.util_trigger
     with st.spinner(f"🌀 Generating utilization for '{util_req['pattern']}'..."):
-        util_prompt = f"""Контекст:
-Собеседник сказал: {util_req['quote']}
-Был применен фокус: {util_req['pattern']}
+        util_prompt = f"""Context:
+User Quote: {util_req['quote']}
+Applied Pattern: {util_req['pattern']}
 
-МАТРИЦА УТИЛИЗАЦИИ ГЕРАСИМОВА (Строгие правила контр-приемов):
-- Намерение утилизируется через: Переопределение, Другой результат, Иерархия критериев, Метафрейм.
-- Переопределение: Обратное переопределение, Метафрейм.
-- Последствия: Последствия (встречные), Метафрейм.
-- Разделение: Разделение, Обобщение, Иерархия критериев, Метафрейм.
-- Обобщение: Разделение, Стратегия реальности, Противоположный пример, Метафрейм.
-- Аналогия: встречная Аналогия, Стратегия реальности, Метафрейм.
-- Размер фрейма: встречный Размер фрейма, Метафрейм.
-- Другой результат: Последствия, встречный Другой результат, Метафрейм.
-- Модель мира: контр-Модель мира, Иерархия критериев, Метафрейм.
-- Стратегия реальности: Метафрейм.
-- Противоположный пример: Последствия, Обобщение, Метафрейм.
-- Иерархия критериев: Разделение, Стратегия реальности, Метафрейм.
-- Применение к себе: Размер фрейма, Метафрейм.
-- Метафрейм: Метафрейм более высокого уровня.
+GERASIMOV'S UTILIZATION MATRIX (Strict Counter-Pattern Rules):
+- Intention is utilized by: Redefining, Another Outcome, Hierarchy of Criteria, Meta Frame.
+- Redefining: Counter-Redefining, Meta Frame.
+- Consequences: Counter-Consequences, Meta Frame.
+- Chunking Down: Chunking Down, Chunking Up, Hierarchy of Criteria, Meta Frame.
+- Chunking Up: Chunking Down, Strategy of Reality, Counter Example, Meta Frame.
+- Analogy: Counter-Analogy, Strategy of Reality, Meta Frame.
+- Change Frame Size: Counter-Change Frame Size, Meta Frame.
+- Another Outcome: Consequences, Counter-Another Outcome, Meta Frame.
+- Model of the World: Counter-Model of the World, Hierarchy of Criteria, Meta Frame.
+- Strategy of Reality: Meta Frame.
+- Counter Example: Consequences, Chunking Up, Meta Frame.
+- Hierarchy of Criteria: Chunking Down, Strategy of Reality, Meta Frame.
+- Apply to Self: Change Frame Size, Meta Frame.
+- Meta Frame: Higher-level Meta Frame.
 
-Задача:
-1. Найди в "Матрице Утилизации" контр-фокусы, которые бьют паттерн '{util_req['pattern']}'.
-2. Сгенерируй 3 профессиональных варианта ответа (утилизации), используя ИМЕННО ЭТИ разрешенные контр-фокусы. Для каждого варианта укажи, какой именно контр-фокус был применен (имена контр-фокусов пиши на Английском языке).
-3. ОТВЕЧАЙ НА ТОМ ЖЕ ЯЗЫКЕ: Сами сгенерированные фразы обязаны соответствовать языку цитаты (Иврит, Русский, Английский).
+Task:
+1. Find the allowed counter-patterns in the "Utilization Matrix" that beat the pattern '{util_req['pattern']}'.
+2. Generate 3 professional counter-responses (utilizations), using EXACTLY THESE allowed counter-patterns.
+3. LANGUAGE RULE: The actual generated counter-responses (the phrases you suggest saying) MUST be in the EXACT SAME LANGUAGE as the User Quote (e.g., if Hebrew, the phrases must be Hebrew). However, ALL auxiliary text, explanations, and counter-pattern names MUST be STRICTLY IN ENGLISH.
 """
         try:
             r = client.models.generate_content(model='gemini-2.5-flash', contents=util_prompt)
