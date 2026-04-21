@@ -2,3 +2,5 @@ streamlit
 google-genai
 python-dotenv
 pydantic
+pypdf
+python-docx
